@@ -1,0 +1,33 @@
+# XcodeGen spec. Run `xcodegen generate` in this folder to produce AudioLens.xcodeproj.
+# (brew install xcodegen). Or create the project by hand — see README.md.
+name: AudioLens
+options:
+  bundleIdPrefix: com.example
+  deploymentTarget:
+    iOS: "17.0"
+  xcodeVersion: "16.0"
+packages:
+  MediaPipe:
+    url: https://github.com/google-ai-edge/mediapipe.git
+    from: 1.1.0
+targets:
+  AudioLens:
+    type: application
+    platform: iOS
+    sources: [AudioLens]
+    dependencies:
+      - package: MediaPipe
+        product: MediaPipeTasksRetrieval
+    info:
+      path: AudioLens/Info.plist
+      properties:
+        CFBundleDisplayName: AudioLens
+        UILaunchScreen: {}
+        UIFileSharingEnabled: true          # drop audio into the app via Finder / Files
+        LSSupportsOpeningDocumentsInPlace: true
+        NSMicrophoneUsageDescription: Not used; audio comes from files you import.
+    settings:
+      base:
+        SWIFT_VERSION: "5.10"
+        TARGETED_DEVICE_FAMILY: "1"
+        OTHER_LDFLAGS: ["-ObjC"]
