@@ -1,0 +1,5 @@
+torch>=2.2
+sentence-transformers[audio]>=6.1.0
+transformers
+numpy
+scikit-learn
