@@ -99,11 +99,30 @@ def find_audio_files(root: Path) -> list[Path]:
 # --------------------------------------------------------------------------- model
 
 
+def _preflight(model_id: str) -> None:
+    """Fail early with a readable message if the weights can't be reached."""
+    if Path(model_id).expanduser().is_dir():
+        return
+    try:
+        from huggingface_hub import hf_hub_download
+        hf_hub_download(model_id, "config.json")
+    except Exception as e:  # noqa: BLE001
+        msg = f"{type(e).__name__}: {str(e).splitlines()[0][:200]}"
+        hint = ("Can't fetch weights from huggingface.co. Check network access, or download the model on "
+                "another machine (`huggingface-cli download google/embeddinggemma-2 --local-dir ./embeddinggemma-2`) "
+                "and pass --model ./embeddinggemma-2.")
+        if "401" in msg or "403" in msg or "gated" in msg.lower():
+            hint += " If the repo is gated, accept the licence on the model page and run `huggingface-cli login`."
+        sys.exit(f"Could not load {model_id}\n  {msg}\n  {hint}")
+
+
 class Embedder:
     """Thin wrapper around SentenceTransformer (text + audio encoders only)."""
 
-    def __init__(self, model_id: str = MODEL_ID, dim: int | None = None, device: str | None = None):
+    def __init__(self, model_id: str | None = MODEL_ID, dim: int | None = None, device: str | None = None):
         self.dim = dim
+        model_id = model_id or MODEL_ID
+        self.model_id = model_id
         if os.environ.get("AUDIO_EMBED_FAKE"):
             self.model = None
             self._dim = dim or 768
@@ -112,6 +131,7 @@ class Embedder:
         import torch
         from sentence_transformers import SentenceTransformer
 
+        _preflight(model_id)
         if device is None:
             device = "cuda" if torch.cuda.is_available() else "cpu"
         # bf16 on GPUs that support it; float32 elsewhere. Never float16 (NaNs).
@@ -220,7 +240,7 @@ def cmd_index(a):
     if idx.info and idx.info.get("dim") and a.dim and idx.info["dim"] != a.dim:
         sys.exit(f"Index was built with dim={idx.info['dim']}; pass --dim {idx.info['dim']} or use a new --index")
     emb = Embedder(a.model, dim=a.dim or idx.info.get("dim"), device=a.device)
-    idx.info.update({"model": a.model, "dim": emb._dim, "window_sec": a.window, "hop_sec": a.hop,
+    idx.info.update({"model": emb.model_id, "dim": emb._dim, "window_sec": a.window, "hop_sec": a.hop,
                      "sample_rate": SAMPLE_RATE, "root": str(root)})
 
     todo = []
